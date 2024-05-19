@@ -12,15 +12,13 @@ public class Tile : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
     [SerializeField]
     BlockSpawner Bloccy;
     Image blockSprite;
-    int posX, posY;
-    int deltaX, deltaY;
-    int dir;
-    int tileID;
+    int posX, posY, deltaX, deltaY, dir, tileID, initX, initY;
+    bool outMoused = false;
     int windX = 0, windY = 0;
     public void OnBeginDrag(PointerEventData eventData)
     {
         //print("start drag");
-        Bloccy.startDragState();
+        Bloccy.startDragState(tileID);
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -79,10 +77,6 @@ public class Tile : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         windX+= x;
         windY+= y;
     }
-    void unwind(int x, int y)
-    {
-
-    }
 
     // Start is called before the first frame update
     void Start()
@@ -94,7 +88,7 @@ public class Tile : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHand
         Color randomColor = Color.HSVToRGB(randomHue, 0.7f, 1);
         blockSprite.color = randomColor;
         posX = snappy.LocalToCell(transform.position).x;
-        posY = snappy.LocalToCell(transform.position).y;
+        posY = snappy.LocalToCell(transform.position).y;     
     }
 
     public void init(int ID)

@@ -8,11 +8,12 @@ public class BlockSpawner : MonoBehaviour
     public Canvas canv;
     public Grid gridd;
     bool dragging = false, draggingleft = false, draggingUp = false;
-    int uniqID = 1;
+    int uniqID = 1, startingX = 0, startingY = 0;
     bool jammed =false;
     int[,] positionTable = new int[20,20];
     int[,] preClickTable = new int[20,20];
     GameObject[] spawnedTile;
+    GameObject activeTile;
     // Start is called before the first frame update
     void Start()
     {
@@ -36,14 +37,14 @@ public class BlockSpawner : MonoBehaviour
         
     }
 
-    public void startDragState()
+    public void startDragState(int tileID)
     {
         if (dragging != true)
         {
             dragging = true;
             preClickTable = (int[,])positionTable.Clone();
-            print("dragging started");
         }
+        activeTile = spawnedTile[tileID];
     }
     public void endDragState()
     {
@@ -66,8 +67,13 @@ public class BlockSpawner : MonoBehaviour
 
         }
         positionTable = (int[,])preClickTable.Clone();
-        print("dragging ended");
 
+    }
+    public void writeInitXY(int x, int y)
+    {
+        startingX = x;
+        startingY = y;
+        print (startingX + ", " + startingY);
     }
     public void checkMove(int posx, int posy,int direction)
     {
@@ -89,11 +95,12 @@ public class BlockSpawner : MonoBehaviour
     
     void moveTiles(int posx, int posy, int dirX, int dirY)
     {
+        
         if (positionTable[posx, posy] == 0)
         {
             return;
         }
-        if (posx+dirX < 0)
+        if (posx + dirX < 0)
         {
             print("Dragged too far");
             jammed = true;
@@ -110,17 +117,21 @@ public class BlockSpawner : MonoBehaviour
         { 
             return; 
         }
-        if(draggingleft)
+        if(draggingleft && dirY != 0)
         {
-            //dirY = 0;
+            //jammed = true;
+            return;
         }
-        else if(draggingUp)
+        else if(draggingUp && dirX != 0)
         {
-            //dirX = 0;
+            return;
         }
+        
+        
         spawnedTile[positionTable[posx, posy]].GetComponent<Tile>().move(posx + dirX, posy + dirY);
         positionTable[posx + dirX, posy + dirY] = positionTable[posx, posy];
         positionTable[posx, posy] = 0;
         return;
     }
 }
+
