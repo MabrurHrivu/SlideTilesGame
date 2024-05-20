@@ -1,24 +1,15 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.InteropServices.WindowsRuntime;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class Tile : MonoBehaviour
 {
     public Grid snappy;
-    [SerializeField]
-    BlockSpawner Bloccy;
     Image blockSprite;
-    int deltaX, deltaY, dir, tileID, initX, initY;
+    int tileID;
 
     public int posX,posY;
-    bool outMoused = false;
-    int windX = 0, windY = 0;
-    
-
 
     public void move(int posx, int posy)
     {
@@ -26,16 +17,10 @@ public class Tile : MonoBehaviour
         posX = posx;
         posY= posy;
     }
-    void wind(int x, int y)
-    {
-        windX+= x;
-        windY+= y;
-    }
 
     // Start is called before the first frame update
     void Start()
     {
-        Bloccy = GameObject.FindGameObjectWithTag("logic").GetComponent<BlockSpawner>();
         snappy = GameObject.FindGameObjectWithTag("snapping grid").GetComponent<Grid>();
         blockSprite = GetComponent<Image>();
         float randomHue = UnityEngine.Random.Range(0f, 1f);
