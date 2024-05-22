@@ -429,7 +429,7 @@ Canvas:
   m_OverrideSorting: 0
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
-  m_VertexColorAlwaysGammaSpace: 0
+  m_VertexColorAlwaysGammaSpace: 1
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -466,7 +466,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95aac51b6b1deb947b7570b5efd051c5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  tilePrefab: {fileID: 7610155438308578148, guid: d84a90f7f8f721640a29f9f5b0b09ab7, type: 3}
+  tilePrefab: {fileID: 6620557865521280761, guid: ee272d81bfbb9ac46a55cd5a523bd747, type: 3}
   canv: {fileID: 856528754}
   gridd: {fileID: 1440338648}
 --- !u!1 &1123138376

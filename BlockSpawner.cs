@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     public GameObject tilePrefab;
+    
     public Canvas canv;
     public Grid gridd;
     bool dragging = false, draggingleft = false, draggingUp = false;
@@ -25,13 +26,31 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         {
             for (int j = 0; j < 3; j++)
             {
-                spawnedTile[uniqID] = Instantiate(tilePrefab, gridd.GetCellCenterLocal(new Vector3Int(i, j, 1)), Quaternion.identity, canv.transform);
+                spawnedTile[uniqID] = Instantiate(randomTile(), gridd.GetCellCenterLocal(new Vector3Int(i, j, 1)), Quaternion.identity, canv.transform);
                 spawnedTile[uniqID].GetComponent<Tile>().init(uniqID);
                 positionTable[i, j] = uniqID;
                 uniqID++;
             }
         }
         
+    }
+    GameObject randomTile()
+    {
+        // Ensure TileRefList is initialized and has prefabs
+        if (TileRefList.Instance != null && TileRefList.Instance.tileType.Length > 0)
+        {
+            // Get a random index
+            int randomIndex = Random.Range(0, TileRefList.Instance.tileType.Length);
+            
+            // return a prefab at the random index
+            return TileRefList.Instance.tileType[randomIndex];
+
+        }
+        else
+        {
+            Debug.LogError("TileRefList is not initialized or has no prefabs!");
+            return null;
+        }
     }
 
     public void OnBeginDrag(PointerEventData eventData)
