@@ -10,23 +10,30 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
     
     public Canvas canv;
     public Grid gridd;
+    public int tileCount;
     bool dragging = false, draggingleft = false, draggingUp = false;
     int uniqID = 1, startingX = 0, startingY = 0, dir=0;
     bool jammed =false;
-    int[,] positionTable = new int[20,20];
-    int[,] preClickTable = new int[20,20];
+    int[,] positionTable = new int[30,10];
+    int[,] preClickTable = new int[30,10];
     Vector3Int mousePos, mousePos2, lastPos;
     GameObject[] spawnedTile;
     GameObject activeTile;
     // Start is called before the first frame update
     void Start()
     {
-        spawnedTile = new GameObject[100];
-        for (int i = 0; i < 5; i++)
+        spawnedTile = new GameObject[tileCount+1];
+        prepareTileList(spawnedTile);
+
+        for (int j = 0; j < 4; j++)
         {
-            for (int j = 0; j < 3; j++)
+            for (int i = 0; i < 5; i++)
             {
-                spawnedTile[uniqID] = Instantiate(randomTile(), gridd.GetCellCenterLocal(new Vector3Int(i, j, 1)), Quaternion.identity, canv.transform);
+                if (uniqID == spawnedTile.Length)
+                {
+                    break;
+                }
+                spawnedTile[uniqID] = Instantiate(spawnedTile[uniqID], gridd.GetCellCenterLocal(new Vector3Int(i, j, 1)), Quaternion.identity, canv.transform);
                 spawnedTile[uniqID].GetComponent<Tile>().init(uniqID);
                 positionTable[i, j] = uniqID;
                 uniqID++;
@@ -34,17 +41,29 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         }
         
     }
+
+    void prepareTileList(GameObject[] tileList)
+    {
+        //private GameObject[] prefabArray = new GameObject[20];
+        int currentIndex = 1;
+        while (currentIndex < tileList.Length)
+        {
+            GameObject selectedPrefab = randomTile();
+            // Insert the prefab twice into the array
+            tileList[currentIndex++] = selectedPrefab;
+            tileList[currentIndex++] = selectedPrefab;
+        }
+        ShuffleArray(tileList);
+    }
+
+    //returns a random prefab from the global prefab list
     GameObject randomTile()
     {
         // Ensure TileRefList is initialized and has prefabs
         if (TileRefList.Instance != null && TileRefList.Instance.tileType.Length > 0)
         {
-            // Get a random index
             int randomIndex = Random.Range(0, TileRefList.Instance.tileType.Length);
-            
-            // return a prefab at the random index
             return TileRefList.Instance.tileType[randomIndex];
-
         }
         else
         {
@@ -80,8 +99,6 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         mousePos2 = gridd.LocalToCell(mousePos);
         mousePos2.z = 15;
         mousePos = Vector3Int.FloorToInt(gridd.GetCellCenterLocal(mousePos2));
-        print("mousePos2:" +mousePos2);
-        print("lastPos:" +lastPos);
         //transform.position = mousePos;
         if (lastPos != mousePos2)
         {
@@ -99,6 +116,10 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         dragging = false;
         draggingUp = false;
         draggingleft = false;
+        cancelMove();
+    }
+    void cancelMove()
+    {
         for (int i = 0; i < 8; i++)
         {
             for (int j = 0; j < 8; j++)
@@ -107,7 +128,6 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
                 if (preClickTable[i, j] != 0)
                 {
                     spawnedTile[preClickTable[i, j]].GetComponent<Tile>().move(i, j);
-                    print("tried moving " + i + ", " +j);
                 }
 
             }
@@ -116,11 +136,6 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         positionTable = (int[,])preClickTable.Clone();
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
      int checkDir(int oldx, int newx, int oldy, int newy)
     {
         if (oldx < newx)
@@ -174,13 +189,13 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         {
             return;
         }
-        if (posx + dirX < 0)
+        if (posx + dirX < 0 || posx + dirX > 25)
         {
             print("Dragged too far");
             jammed = true;
             return;
         }
-        if (posy + dirY < 0)
+        if (posy + dirY < 0 || posy + dirY > 8)
         {
             print("Dragged too far");
             jammed = true;
@@ -206,6 +221,18 @@ public class BlockSpawner : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
         positionTable[posx + dirX, posy + dirY] = positionTable[posx, posy];
         positionTable[posx, posy] = 0;
         return;
+    }
+
+    // Method to shuffle an array, without touching index 0
+    void ShuffleArray(GameObject[] array)
+    {
+        for (int i = array.Length - 1; i > 1; i--)
+        {
+            int randomIndex = Random.Range(1, i + 1);
+            GameObject temp = array[i];
+            array[i] = array[randomIndex];
+            array[randomIndex] = temp;
+        }
     }
 }
 
