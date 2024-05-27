@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class Tile : MonoBehaviour
 {
-    public Grid snappy;
+
     Image blockSprite;
     int tileID;
 
@@ -15,7 +15,7 @@ public class Tile : MonoBehaviour
 
     public void move(int posx, int posy)
     {
-        transform.position = (snappy.GetCellCenterLocal(new Vector3Int(posx,posy,5)));
+        transform.position = (RefList.Instance.gridd.GetCellCenterLocal(new Vector3Int(posx,posy,5)));
         posX = posx;
         posY= posy;
     }
@@ -23,14 +23,10 @@ public class Tile : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        snappy = GameObject.FindGameObjectWithTag("snapping grid").GetComponent<Grid>();
         blockSprite = GetComponent<Image>();
-        //float randomHue = UnityEngine.Random.Range(0f, 1f);
-        //Color randomColor = Color.HSVToRGB(randomHue, 0.7f, 1);
-        //blockSprite.color = randomColor;
         setType();
-        posX = snappy.LocalToCell(transform.position).x;
-        posY = snappy.LocalToCell(transform.position).y;     
+        posX = RefList.Instance.gridd.LocalToCell(transform.position).x;
+        posY = RefList.Instance.gridd.LocalToCell(transform.position).y;     
     }
 
     void setType()
@@ -41,11 +37,5 @@ public class Tile : MonoBehaviour
     public void init(int ID)
     {
         tileID = ID;
-    }
-    // Update is called once per frame
-    void Update()
-    {
-
-
     }
 }
