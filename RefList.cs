@@ -23,7 +23,7 @@ public class RefList : MonoBehaviour
     public Grid gridd;
     public int[,] positionTable;
     public Canvas canv;
-    public int tileCount;
+    public int tileCount, columns=24,rows=8;
     public GameObject[] spawnedTile; 
 
     private void Awake()
@@ -33,8 +33,9 @@ public class RefList : MonoBehaviour
             _instance = this;
             DontDestroyOnLoad(gameObject);
 
-            spawnedTile = new GameObject[tileCount+1]; 
-            positionTable = new int[30,10];
+            spawnedTile = new GameObject[rows*columns]; 
+
+            positionTable = new int[columns,rows];
         }
         else if (_instance != this)
         {
@@ -55,6 +56,4 @@ public class RefList : MonoBehaviour
             }
         }
     }
-
-    // Example of how you might instantiate a prefab from the array
 }

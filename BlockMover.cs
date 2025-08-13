@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -6,19 +7,19 @@ using UnityEngine.EventSystems;
 
 public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
-    public Canvas canv;
+
     RefList Refs;
     bool dragging = false, draggingleft = false, draggingUp = false;
-    int startingX = 0, startingY = 0, dir=0;
+    int dir=0,activeLine=0 ;
     bool jammed =false;
-    int[,] preClickTable = new int[30,10];
+    int[,] preClickTable;
     Vector3Int mousePos, mousePos2, lastPos;
     GameObject activeTile;
     // Start is called before the first frame update
     void Start()
     {
         Refs = RefList.Instance;
-        
+        preClickTable = new int[Refs.columns,Refs.rows];
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -27,6 +28,14 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (dragging != true)
         {
             dragging = true;
+            foreach (GameObject tile in Refs.spawnedTile)
+            {
+                if (tile != null)
+                {
+                    tile.GetComponent<Tile>().recordOldPosition();
+                }
+
+            }
             preClickTable = (int[,])Refs.positionTable.Clone();
         }
         mousePos = Vector3Int.FloorToInt(Camera.main.ScreenToWorldPoint(Input.mousePosition)); 
@@ -50,8 +59,11 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         mousePos = Vector3Int.FloorToInt(Refs.gridd.GetCellCenterLocal(mousePos2));
         if (lastPos != mousePos2)
         {
-            dir =checkDir(lastPos.x, mousePos2.x, lastPos.y, mousePos2.y);
-            checkMove(activeTile.GetComponent<Tile>().posX, activeTile.GetComponent<Tile>().posY,dir);
+            int posX = Convert.ToInt32(mousePos2.x > lastPos.x) - Convert.ToInt32(mousePos2.x < lastPos.x);
+            int posY = Convert.ToInt32(mousePos2.y > lastPos.y) - Convert.ToInt32(mousePos2.y < lastPos.y);
+            checkMoveDir(activeTile.GetComponent<Tile>().posX, activeTile.GetComponent<Tile>().posY, posX, posY);
+            pushTiles(activeTile.GetComponent<Tile>().posX, activeTile.GetComponent<Tile>().posY, posX, posY);
+            //pullBackTiles();
             lastPos = mousePos2;
         }
         
@@ -67,9 +79,9 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     }
     void cancelMove()
     {
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < Refs.columns; i++)
         {
-            for (int j = 0; j < 8; j++)
+            for (int j = 0; j < Refs.rows; j++)
             {
                 
                 if (preClickTable[i, j] != 0)
@@ -83,90 +95,96 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         Refs.positionTable = (int[,])preClickTable.Clone();
     }
 
-     int checkDir(int oldx, int newx, int oldy, int newy)
-    {
-        if (oldx < newx)
-        {
-            return 2;
-        }
-        if (oldx > newx)
-        {
-            return 4;
-        }
-        if (oldy < newy)
-        {
-            return 1;
-        }
-        if (oldy > newy)
-        {
-            return 3;
-        }
-        return 0;
-    }
 
-
-    public void writeInitXY(int x, int y)
+    public void checkMoveDir(int posx, int posy,int posX, int posY)
     {
-        startingX = x;
-        startingY = y;
-        print (startingX + ", " + startingY);
-    }
-    public void checkMove(int posx, int posy,int direction)
-    {
-        int horizMovement = -((direction - 3) * ((direction+1) % 2)); // gives -1 for left and 1 for right
-        int vertMovement = -((direction - 2) * (direction%2)); // gives 1 for up and -1 for down
         if(!draggingleft && !draggingUp)
         {
-            if(horizMovement != 0)
+            if(posX != 0)
             {
                 draggingleft = true;
+                activeLine = posx;
             }
-            else if(vertMovement != 0)
+            else if(posY != 0)
             {
                 draggingUp = true;
+                activeLine = posy;
             }
-        }
-        moveTiles(posx, posy, horizMovement, vertMovement);  
+        }  
     }  
     
-    void moveTiles(int posx, int posy, int dirX, int dirY)
+    void pushTiles(int posx, int posy, int dirX, int dirY)
     {
         
         if (Refs.positionTable[posx, posy] == 0)
         {
             return;
         }
+
+        //ignore vertical movement when dragging sideways
         if(draggingleft && dirY != 0)
         {
             //jammed = true;
             return;
         }
+
+        //ignore horizontal movement when dragging vertically
         else if(draggingUp && dirX != 0)
         {
             return;
         }
-        if (posx + dirX < 0 || posx + dirX > 25)
+        if (posx + dirX < 0 || posx + dirX > Refs.columns-1)
         {
             print("Dragged too far");
             jammed = true;
             return;
         }
-        if (posy + dirY < 0 || posy + dirY > 8)
+        if (posy + dirY < 0 || posy + dirY > Refs.rows-1)
         {
             print("Dragged too far");
             jammed = true;
             return;
         }
-        moveTiles(posx + dirX, posy + dirY, dirX, dirY);
+        pushTiles(posx + dirX, posy + dirY, dirX, dirY);
         if (jammed) 
         { 
             return; 
         }
-
+        /*
+*/
         Refs.spawnedTile[Refs.positionTable[posx, posy]].GetComponent<Tile>().move(posx + dirX, posy + dirY);
         Refs.positionTable[posx + dirX, posy + dirY] = Refs.positionTable[posx, posy];
         Refs.positionTable[posx, posy] = 0;
         return;
+    }
+    void pullBackTiles()
+    {
+        if (draggingleft)
+        {
+            for (int i=0; i<Refs.columns;i++)
+            {
+                GameObject currentObject = Refs.spawnedTile[Refs.positionTable[i,activeLine]];
+                if (currentObject != null)
+                {
+                    Tile currentTile = currentObject.GetComponent<Tile>();
+                    int dist = i - currentTile.getoldX();
+                    currentTile.setText(dist.ToString());
+                }
+            }
+        }
+        else if (draggingUp)
+        {
+            for (int j=0; j<Refs.rows;j++)
+            {
+                GameObject currentObject = Refs.spawnedTile[Refs.positionTable[activeLine,j]];
+                if (currentObject != null)
+                {
+                    Tile currentTile = currentObject.GetComponent<Tile>();
+                    int dist = j - currentTile.getoldY();
+                    currentTile.setText(dist.ToString());
+                }    
+            }
+        }
     }
 }
 

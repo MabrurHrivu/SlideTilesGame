@@ -483,7 +483,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 95aac51b6b1deb947b7570b5efd051c5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  canv: {fileID: 856528754}
 --- !u!1 &907614973
 GameObject:
   m_ObjectHideFlags: 0
@@ -521,7 +520,9 @@ MonoBehaviour:
   - {fileID: 6620557865521280761, guid: fd65b84cf0916ba43b5f0e80ae154f4c, type: 3}
   gridd: {fileID: 1440338648}
   canv: {fileID: 856528754}
-  tileCount: 20
+  tileCount: 24
+  columns: 15
+  rows: 8
   spawnedTile: []
 --- !u!4 &907614975
 Transform:
