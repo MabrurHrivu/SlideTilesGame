@@ -14,11 +14,17 @@ public class Tile : MonoBehaviour
 
     public int posX,posY, oldX, oldY;
     public TMP_Text myText;
+
+    // NEW: displacement properties
+    public int dispX => posX - oldX;
+    public int dispY => posY - oldY;
+
     public void move(int posx, int posy)
     {
-        transform.position = (RefList.Instance.gridd.GetCellCenterLocal(new Vector3Int(posx,posy,5)));
+        transform.position = (RefList.Instance.gridd.GetCellCenterLocal(new Vector3Int(posx, posy, 5)));
         posX = posx;
-        posY= posy;
+        posY = posy;
+        setText();
     }
 
     // Start is called before the first frame update
@@ -26,7 +32,7 @@ public class Tile : MonoBehaviour
     {
         blockSprite = GetComponent<Image>();
         setType();
-        myText.text = "0";
+        setText();
         posX = RefList.Instance.gridd.LocalToCell(transform.position).x;
         posY = RefList.Instance.gridd.LocalToCell(transform.position).y;     
     }
@@ -35,9 +41,9 @@ public class Tile : MonoBehaviour
     {
         blockSprite.color = color;
     }
-    public void setText(string text)
+    public void setText()
     {
-        myText.text = text;
+        myText.text =(Mathf.Abs(dispX) + Mathf.Abs(dispY)).ToString();
     }
 
     public void init(int ID)
