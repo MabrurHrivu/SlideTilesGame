@@ -8,45 +8,33 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 {
     RefList Refs;
     bool dragging = false, draggingleft = false, draggingUp = false;
-    int dir = 0, activeLine = -1;
+    int activeLine = -1;
     bool jammed = false;
 
     // New: whether this drag has a valid tile under cursor
     bool dragValid = false;
 
-    int[,] preClickTable;
-    Vector3Int mousePos, mousePos2, lastPos;
+    Vector3Int mousePos, lastPos;
     GameObject activeTile;
 
     void Start()
     {
         Refs = RefList.Instance;
-        preClickTable = new int[Refs.columns, Refs.rows];
     }
 
     public void OnBeginDrag(PointerEventData eventData)
     {
-        // reset per-drag state
-        dragValid = false;
-        activeTile = null;
-
-        if (!dragging)
+        dragging = true;
+        //tell the tiles to write down their positions before rrag
+        foreach (GameObject tile in Refs.spawnedTile)
         {
-            dragging = true;
-            foreach (GameObject tile in Refs.spawnedTile)
-            {
-                if (tile != null)
-                    tile.GetComponent<Tile>().recordOldPosition();
-            }
-            preClickTable = (int[,])Refs.positionTable.Clone();
+            if (tile != null)
+                tile.GetComponent<Tile>().recordOldPosition();
         }
+        mousePos = Vector3Int.FloorToInt(Camera.main.ScreenToWorldPoint(Input.mousePosition)); //mouse position relative to game
+        mousePos = Refs.gridd.LocalToCell(mousePos); //mouse position to cell co-ordinate
 
-        mousePos = Vector3Int.FloorToInt(Camera.main.ScreenToWorldPoint(Input.mousePosition));
-        mousePos.z = 15;
-        mousePos2 = Refs.gridd.LocalToCell(mousePos);
-        mousePos = Vector3Int.FloorToInt(Refs.gridd.GetCellCenterLocal(mousePos2));
-
-        GameObject tileGO = Refs.spawnedTile[Refs.positionTable[mousePos2.x, mousePos2.y]];
+        GameObject tileGO = Refs.spawnedTile[Refs.positionTable[mousePos.x, mousePos.y]];
         if (tileGO == null)
             return;
 
@@ -56,57 +44,59 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
             return;
 
         lastPos = new Vector3Int(tileComp.posX, tileComp.posY, 15);
-        dragValid = true; // ✅ only now do we consider this drag valid
+        dragValid = true;
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (!dragging || !dragValid) return; // gate the whole drag
+        if (!dragging || !dragValid) return;
 
-        mousePos = Vector3Int.FloorToInt(Camera.main.ScreenToWorldPoint(Input.mousePosition));
-        mousePos.z = 15;
-        mousePos2 = Refs.gridd.LocalToCell(mousePos);
-        mousePos2.z = 15;
+        mousePos = Vector3Int.FloorToInt(Camera.main.ScreenToWorldPoint(Input.mousePosition)); //mouse position relative to game
+        mousePos = Refs.gridd.LocalToCell(mousePos); //mouse position to cell co-ordinate
+        mousePos.z = 15; // to make sure the next condition is only true when it should be
 
-        if (lastPos != mousePos2)
+        if (lastPos != mousePos)
+        {
+            var tileComp = activeTile.GetComponent<Tile>();
+
+            bool axisAligned = true;
+            if (draggingleft && lastPos.x != tileComp.posX) axisAligned = false;
+            if (draggingUp   && lastPos.y != tileComp.posY) axisAligned = false;
+
+            if (axisAligned)
             {
-                var tileComp = activeTile.GetComponent<Tile>();
-                //set posX and posY to -1 or 1 depending on the direction of drag
-                int posX = Convert.ToInt32(mousePos2.x > lastPos.x) - Convert.ToInt32(mousePos2.x < lastPos.x);
-                int posY = Convert.ToInt32(mousePos2.y > lastPos.y) - Convert.ToInt32(mousePos2.y < lastPos.y);
-                checkMoveDir(tileComp.posX, tileComp.posY, posX, posY);
-                pushTiles(tileComp.posX, tileComp.posY, posX, posY);
-                pullBackTiles();
-                lastPos = mousePos2;
+                jammed = false;
+
+                int posX = Math.Sign(mousePos.x - lastPos.x);
+                int posY = Math.Sign(mousePos.y - lastPos.y);
+
+                // only proceed if movement matches drag axis
+                bool validMove = !(draggingleft && posY != 0) && !(draggingUp && posX != 0);
+
+                if (validMove)
+                {
+                    checkMoveDir(tileComp.posX, tileComp.posY, posX, posY);
+                    pushTiles(tileComp.posX, tileComp.posY, posX, posY);
+                    pullBackTiles();
+                }
             }
+
+            // update the cell that the drag is compared against
+            lastPos = mousePos;
+        }
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        activeTile = null;
+        pullBackTiles();
         jammed = false;
         dragging = false;
         draggingUp = false;
         draggingleft = false;
         dragValid = false;
-        activeTile = null;
         activeLine = -1;
-
-        cancelMove(); // keep your original behavior
     }
-
-    void cancelMove()
-    {
-        for (int i = 0; i < Refs.columns; i++)
-        {
-            for (int j = 0; j < Refs.rows; j++)
-            {
-                if (preClickTable[i, j] != 0)
-                    Refs.spawnedTile[preClickTable[i, j]].GetComponent<Tile>().move(i, j);
-            }
-        }
-        Refs.positionTable = (int[,])preClickTable.Clone();
-    }
-
     public void checkMoveDir(int posx, int posy, int posX, int posY)
     {
         if (!draggingleft && !draggingUp)
@@ -120,9 +110,6 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     {
         int tileID = Refs.positionTable[posx, posy];
         if (tileID == 0 || Refs.spawnedTile[tileID] == null) return;
-
-        if (draggingleft && dirY != 0) return;
-        if (draggingUp && dirX != 0) return;
 
         // Set activeLine on first move
         if (activeLine == -1)  // assuming -1 = unset
@@ -151,17 +138,17 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         Refs.positionTable[posx, posy] = 0;
     }
 
-    void pullBackTiles()
+   void pullBackTiles()
     {
         if (activeLine == -1) return;
 
         bool moved;
-
         do
         {
             moved = false;
 
-            if (draggingleft) // horizontal pullback along row
+            // Horizontal pullback
+            if (draggingleft)
             {
                 for (int x = 0; x < Refs.columns; x++)
                 {
@@ -169,23 +156,22 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
                     if (tileID == 0 || Refs.spawnedTile[tileID] == null || Refs.spawnedTile[tileID] == activeTile) continue;
 
                     Tile tile = Refs.spawnedTile[tileID].GetComponent<Tile>();
+                    if (tile.dispX == 0) continue;
 
-                    if (tile.dispX != 0)
+                    int stepX = tile.dispX > 0 ? -1 : 1;
+                    int targetX = x + stepX;
+
+                    if (targetX >= 0 && targetX < Refs.columns && Refs.positionTable[targetX, activeLine] == 0)
                     {
-                        int stepX = tile.dispX > 0 ? -1 : 1;
-                        int targetX = x + stepX;
-
-                        if (targetX >= 0 && targetX < Refs.columns && Refs.positionTable[targetX, activeLine] == 0)
-                        {
-                            tile.move(targetX, activeLine);
-                            Refs.positionTable[targetX, activeLine] = tileID;
-                            Refs.positionTable[x, activeLine] = 0;
-                            moved = true;
-                        }
+                        tile.move(targetX, activeLine);
+                        Refs.positionTable[targetX, activeLine] = tileID;
+                        Refs.positionTable[x, activeLine] = 0;
+                        moved = true;
                     }
                 }
             }
-            else if (draggingUp) // vertical pullback along column
+            // Vertical pullback
+            else if (draggingUp)
             {
                 for (int y = 0; y < Refs.rows; y++)
                 {
@@ -193,23 +179,22 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
                     if (tileID == 0 || Refs.spawnedTile[tileID] == null || Refs.spawnedTile[tileID] == activeTile) continue;
 
                     Tile tile = Refs.spawnedTile[tileID].GetComponent<Tile>();
+                    if (tile.dispY == 0) continue;
 
-                    if (tile.dispY != 0)
+                    int stepY = tile.dispY > 0 ? -1 : 1;
+                    int targetY = y + stepY;
+
+                    if (targetY >= 0 && targetY < Refs.rows && Refs.positionTable[activeLine, targetY] == 0)
                     {
-                        int stepY = tile.dispY > 0 ? -1 : 1;
-                        int targetY = y + stepY;
-
-                        if (targetY >= 0 && targetY < Refs.rows && Refs.positionTable[activeLine, targetY] == 0)
-                        {
-                            tile.move(activeLine, targetY);
-                            Refs.positionTable[activeLine, targetY] = tileID;
-                            Refs.positionTable[activeLine, y] = 0;
-                            moved = true;
-                        }
+                        tile.move(activeLine, targetY);
+                        Refs.positionTable[activeLine, targetY] = tileID;
+                        Refs.positionTable[activeLine, y] = 0;
+                        moved = true;
                     }
                 }
             }
 
         } while (moved);
     }
+
 }
