@@ -61,7 +61,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
             bool axisAligned = true;
             if (draggingleft && lastPos.x != tileComp.posX) axisAligned = false;
-            if (draggingUp   && lastPos.y != tileComp.posY) axisAligned = false;
+            if (draggingUp && lastPos.y != tileComp.posY) axisAligned = false;
 
             if (axisAligned)
             {
@@ -89,7 +89,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     public void OnEndDrag(PointerEventData eventData)
     {
         activeTile = null;
-        pullBackTiles();
+        if (!checkMatches()) pullBackTiles();
         jammed = false;
         dragging = false;
         draggingUp = false;
@@ -101,8 +101,8 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     {
         if (!draggingleft && !draggingUp)
         {
-            if (posX != 0) { draggingleft = true;}
-            else if (posY != 0) { draggingUp = true;}
+            if (posX != 0) { draggingleft = true; }
+            else if (posY != 0) { draggingUp = true; }
         }
     }
 
@@ -115,7 +115,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (activeLine == -1)  // assuming -1 = unset
         {
             if (draggingleft) activeLine = posy;   // row
-            if (draggingUp)   activeLine = posx;   // column
+            if (draggingUp) activeLine = posx;   // column
         }
 
         int nextX = posx + dirX;
@@ -138,7 +138,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         Refs.positionTable[posx, posy] = 0;
     }
 
-   void pullBackTiles()
+    void pullBackTiles()
     {
         if (activeLine == -1) return;
 
@@ -196,5 +196,68 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         } while (moved);
     }
+    bool checkMatches()
+    {
+        bool matched = false;
+
+        int limit = draggingleft ? Refs.columns : Refs.rows;
+
+        for (int i = 0; i < limit; i++)
+        {
+            Tile tile;
+
+            if (draggingleft)
+                tile = Refs.spawnedTile[Refs.positionTable[i, activeLine]]?.GetComponent<Tile>();
+            else
+                tile = Refs.spawnedTile[Refs.positionTable[activeLine, i]]?.GetComponent<Tile>();
+
+            if (tile == null) continue;
+
+            if (tile.getDisp() != 0)
+            {
+                if (tryMatchNeighbor(tile, tile.posX, tile.posY + 1))      matched = true; // up
+                else if (tryMatchNeighbor(tile, tile.posX + 1, tile.posY)) matched = true; // right
+                else if (tryMatchNeighbor(tile, tile.posX, tile.posY - 1)) matched = true; // down
+                else if (tryMatchNeighbor(tile, tile.posX - 1, tile.posY)) matched = true; // left
+            }
+        }
+
+        return matched;
+    }
+    bool tryMatchNeighbor(Tile tile, int neighborX, int neighborY)
+    {
+        // bounds check
+        if (neighborX < 0 || neighborY < 0 ||
+            neighborX >= Refs.columns || neighborY >= Refs.rows)
+            return false;
+
+        Tile neighbor = Refs.spawnedTile[Refs.positionTable[neighborX, neighborY]]
+                        ?.GetComponent<Tile>();
+        if (neighbor == null) return false;
+
+        if (neighbor.getDisp() == 0 &&
+            tile.GetTileType() == neighbor.GetTileType())
+        {
+            removeTile(tile);
+            removeTile(neighbor);
+            return true;
+        }
+
+        return false;
+    }
+void removeTile(Tile tile)
+{
+    int x = tile.posX;
+    int y = tile.posY;
+    int id = Refs.positionTable[x, y];
+
+    if (id != 0)
+    {
+        Refs.positionTable[x, y] = 0;
+        Refs.spawnedTile[id] = null;
+    }
+
+    Destroy(tile.gameObject);
+}
 
 }

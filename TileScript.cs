@@ -1,18 +1,14 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
 public class Tile : MonoBehaviour
 {
+    private Image blockSprite;
+    private TileData tileData;   // now auto-assigned
+    private int tileID;
 
-    Image blockSprite;
-    int tileID;
-
-    [SerializeField] Color color = Color.HSVToRGB(0, 0, 0.7f);
-
-    public int posX,posY, oldX, oldY;
+    public int posX, posY, oldX, oldY;
     public TMP_Text myText;
 
     // NEW: displacement properties
@@ -21,29 +17,36 @@ public class Tile : MonoBehaviour
 
     public void move(int posx, int posy)
     {
-        transform.position = (RefList.Instance.gridd.GetCellCenterLocal(new Vector3Int(posx, posy, 5)));
+        transform.position = RefList.Instance.gridd.GetCellCenterLocal(new Vector3Int(posx, posy, 5));
         posX = posx;
         posY = posy;
         setText();
     }
 
-    // Start is called before the first frame update
+    void Awake()
+    {
+        tileData = GetComponent<TileData>();  // auto-find
+        blockSprite = GetComponent<Image>();
+    }
+
     void Start()
     {
-        blockSprite = GetComponent<Image>();
         setType();
         setText();
+
         posX = RefList.Instance.gridd.LocalToCell(transform.position).x;
-        posY = RefList.Instance.gridd.LocalToCell(transform.position).y;     
+        posY = RefList.Instance.gridd.LocalToCell(transform.position).y;
     }
 
     void setType()
     {
-        blockSprite.color = color;
+        if (tileData != null)
+            blockSprite.color = tileData.color;
     }
+
     public void setText()
     {
-        myText.text =(Mathf.Abs(dispX) + Mathf.Abs(dispY)).ToString();
+        myText.text = getDisp().ToString();
     }
 
     public void init(int ID)
@@ -56,16 +59,19 @@ public class Tile : MonoBehaviour
         oldX = posX;
         oldY = posY;
     }
-    public int getoldX()
-    {
-        return oldX;
-    }
-    public int getoldY()
-    {
-        return oldY;
-    }
+
     public int getTileID()
     {
         return tileID;
+    }
+
+    // Expose tileType
+    public string GetTileType()
+    {
+        return tileData != null ? tileData.tileType : "Unknown";
+    }
+    public int getDisp()
+    {
+        return Mathf.Abs(dispX) + Mathf.Abs(dispY);
     }
 }
