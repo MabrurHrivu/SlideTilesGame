@@ -90,6 +90,10 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     {
         activeTile = null;
         if (!checkMatches()) pullBackTiles();
+        else
+        {
+            CompactBoard();
+        }
         jammed = false;
         dragging = false;
         draggingUp = false;
@@ -198,23 +202,25 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     }
     bool checkMatches()
     {
-        bool matched = false;
+        // Skip check if no drag is active
+        if (!draggingleft && !draggingUp) return false;
 
+        bool matched = false;
         int limit = draggingleft ? Refs.columns : Refs.rows;
 
         for (int i = 0; i < limit; i++)
         {
-            Tile tile;
-
-            if (draggingleft)
-                tile = Refs.spawnedTile[Refs.positionTable[i, activeLine]]?.GetComponent<Tile>();
-            else
-                tile = Refs.spawnedTile[Refs.positionTable[activeLine, i]]?.GetComponent<Tile>();
+            // Select the tile from the active row or column
+            Tile tile = draggingleft
+                ? Refs.spawnedTile[Refs.positionTable[i, activeLine]]?.GetComponent<Tile>()
+                : Refs.spawnedTile[Refs.positionTable[activeLine, i]]?.GetComponent<Tile>();
 
             if (tile == null) continue;
 
+            // Only tiles with a displacement value can match
             if (tile.getDisp() != 0)
             {
+                // Check for matching neighbor in each direction
                 if (tryMatchNeighbor(tile, tile.posX, tile.posY + 1))      matched = true; // up
                 else if (tryMatchNeighbor(tile, tile.posX + 1, tile.posY)) matched = true; // right
                 else if (tryMatchNeighbor(tile, tile.posX, tile.posY - 1)) matched = true; // down
@@ -224,6 +230,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         return matched;
     }
+
     bool tryMatchNeighbor(Tile tile, int neighborX, int neighborY)
     {
         // bounds check
@@ -245,19 +252,71 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         return false;
     }
-void removeTile(Tile tile)
-{
-    int x = tile.posX;
-    int y = tile.posY;
-    int id = Refs.positionTable[x, y];
-
-    if (id != 0)
+    void removeTile(Tile tile)
     {
-        Refs.positionTable[x, y] = 0;
-        Refs.spawnedTile[id] = null;
-    }
+        int x = tile.posX;
+        int y = tile.posY;
+        int id = Refs.positionTable[x, y];
 
-    Destroy(tile.gameObject);
-}
+        if (id != 0)
+        {
+            Refs.positionTable[x, y] = 0;
+            Refs.spawnedTile[id] = null;
+        }
+
+        Destroy(tile.gameObject);
+    }
+    void CompactBoard()
+    {
+        int cols = Refs.columns;
+        int rows = Refs.rows;
+
+        // Work on a fresh table
+        int[,] newTable = new int[cols, rows];
+
+        int writeX = 0;
+        for (int readX = 0; readX < cols; readX++)
+        {
+            // Check if column has any tile
+            bool colHasTile = false;
+            for (int y = 0; y < rows; y++)
+            {
+                if (Refs.positionTable[readX, y] != 0) { colHasTile = true; break; }
+            }
+            if (!colHasTile) continue;
+
+            // Copy this column into newTable at writeX
+            for (int y = 0; y < rows; y++)
+                newTable[writeX, y] = Refs.positionTable[readX, y];
+
+            writeX++;
+        }
+
+        // Now compact rows inside the already compacted columns
+        int[,] finalTable = new int[cols, rows];
+        int writeY = 0;
+        for (int readY = 0; readY < rows; readY++)
+        {
+            bool rowHasTile = false;
+            for (int x = 0; x < cols; x++)
+            {
+                if (newTable[x, readY] != 0) { rowHasTile = true; break; }
+            }
+            if (!rowHasTile) continue;
+
+            for (int x = 0; x < cols; x++)
+            {
+                int id = newTable[x, readY];
+                finalTable[x, writeY] = id;
+
+                if (id != 0 && Refs.spawnedTile[id] != null)
+                    Refs.spawnedTile[id].GetComponent<Tile>()?.move(x, writeY);
+            }
+
+            writeY++;
+        }
+
+        Refs.positionTable = finalTable;
+    }
 
 }
