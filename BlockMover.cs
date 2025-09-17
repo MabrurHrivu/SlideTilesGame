@@ -24,6 +24,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        Refs.DisableSmooth();
         dragging = true;
         //tell the tiles to write down their positions before rrag
         foreach (GameObject tile in Refs.spawnedTile)
@@ -88,6 +89,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
     public void OnEndDrag(PointerEventData eventData)
     {
+        Refs.EnableSmooth();
         activeTile = null;
         if (!checkMatches()) pullBackTiles();
         else
@@ -146,60 +148,90 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     {
         if (activeLine == -1) return;
 
+        int cols = Refs.columns;
+        int rows = Refs.rows;
+        int limit = draggingleft ? cols : rows;
+
+        // Save initial positions for this line only
+        var initialPos = new Dictionary<int, Vector2Int>();
+        for (int i = 0; i < limit; i++)
+        {
+            int id = draggingleft ? Refs.positionTable[i, activeLine] 
+                                : Refs.positionTable[activeLine, i];
+            if (id != 0 && Refs.spawnedTile[id] != null && !initialPos.ContainsKey(id))
+            {
+                Tile t = Refs.spawnedTile[id].GetComponent<Tile>();
+                initialPos[id] = new Vector2Int(t.posX, t.posY);
+            }
+        }
+
+        // Clone just the logical table
+        int[,] temp = (int[,])Refs.positionTable.Clone();
+
         bool moved;
         do
         {
             moved = false;
 
-            // Horizontal pullback
-            if (draggingleft)
+            for (int i = 0; i < limit; i++)
             {
-                for (int x = 0; x < Refs.columns; x++)
+                int tileID = draggingleft ? temp[i, activeLine] 
+                                        : temp[activeLine, i];
+                if (tileID == 0 || Refs.spawnedTile[tileID] == null || Refs.spawnedTile[tileID] == activeTile) continue;
+
+                Tile tile = Refs.spawnedTile[tileID].GetComponent<Tile>();
+                if (tile == null) continue;
+
+                int disp = draggingleft ? tile.dispX : tile.dispY;
+                if (disp == 0) continue;
+
+                int step = disp > 0 ? -1 : 1;
+                int target = i + step;
+
+                bool inBounds = draggingleft ? (target >= 0 && target < cols) 
+                                            : (target >= 0 && target < rows);
+                if (!inBounds) continue;
+
+                int nextID = draggingleft ? temp[target, activeLine] 
+                                        : temp[activeLine, target];
+                if (nextID != 0) continue; // blocked
+
+                // --- simulate move ---
+                if (draggingleft)
                 {
-                    int tileID = Refs.positionTable[x, activeLine];
-                    if (tileID == 0 || Refs.spawnedTile[tileID] == null || Refs.spawnedTile[tileID] == activeTile) continue;
-
-                    Tile tile = Refs.spawnedTile[tileID].GetComponent<Tile>();
-                    if (tile.dispX == 0) continue;
-
-                    int stepX = tile.dispX > 0 ? -1 : 1;
-                    int targetX = x + stepX;
-
-                    if (targetX >= 0 && targetX < Refs.columns && Refs.positionTable[targetX, activeLine] == 0)
-                    {
-                        tile.move(targetX, activeLine);
-                        Refs.positionTable[targetX, activeLine] = tileID;
-                        Refs.positionTable[x, activeLine] = 0;
-                        moved = true;
-                    }
+                    temp[target, activeLine] = tileID;
+                    temp[i, activeLine] = 0;
+                    tile.posX = target; // logical only
                 }
-            }
-            // Vertical pullback
-            else if (draggingUp)
-            {
-                for (int y = 0; y < Refs.rows; y++)
+                else
                 {
-                    int tileID = Refs.positionTable[activeLine, y];
-                    if (tileID == 0 || Refs.spawnedTile[tileID] == null || Refs.spawnedTile[tileID] == activeTile) continue;
-
-                    Tile tile = Refs.spawnedTile[tileID].GetComponent<Tile>();
-                    if (tile.dispY == 0) continue;
-
-                    int stepY = tile.dispY > 0 ? -1 : 1;
-                    int targetY = y + stepY;
-
-                    if (targetY >= 0 && targetY < Refs.rows && Refs.positionTable[activeLine, targetY] == 0)
-                    {
-                        tile.move(activeLine, targetY);
-                        Refs.positionTable[activeLine, targetY] = tileID;
-                        Refs.positionTable[activeLine, y] = 0;
-                        moved = true;
-                    }
+                    temp[activeLine, target] = tileID;
+                    temp[activeLine, i] = 0;
+                    tile.posY = target; // logical only
                 }
+
+                moved = true;
             }
 
         } while (moved);
+
+        // Commit final logical state
+        Refs.positionTable = temp;
+
+        // Apply visual moves for tiles that changed
+        foreach (var kv in initialPos)
+        {
+            int id = kv.Key;
+            Tile tile = Refs.spawnedTile[id]?.GetComponent<Tile>();
+            if (tile == null) continue;
+
+            Vector2Int from = kv.Value;
+            if (tile.posX != from.x || tile.posY != from.y)
+                tile.move(tile.posX, tile.posY);
+        }
     }
+
+
     bool checkMatches()
     {
         // Skip check if no drag is active

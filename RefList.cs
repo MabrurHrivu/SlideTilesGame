@@ -23,8 +23,8 @@ public class RefList : MonoBehaviour
     public Grid gridd;
     public int[,] positionTable;
     public Canvas canv;
-    public int tileCount, columns=24,rows=8;
-    public GameObject[] spawnedTile; 
+    public int tileCount, columns = 24, rows = 8;
+    public GameObject[] spawnedTile;
 
     private void Awake()
     {
@@ -33,15 +33,15 @@ public class RefList : MonoBehaviour
             _instance = this;
             DontDestroyOnLoad(gameObject);
 
-            spawnedTile = new GameObject[rows*columns]; 
+            spawnedTile = new GameObject[rows * columns];
 
-            positionTable = new int[columns,rows];
+            positionTable = new int[columns, rows];
         }
         else if (_instance != this)
         {
             Destroy(gameObject);
         }
-        
+
     }
     public static void Initialize()
     {
@@ -56,4 +56,23 @@ public class RefList : MonoBehaviour
             }
         }
     }
+
+    private bool smoothMode = true;
+    public void EnableSmooth()
+    {
+        smoothMode = true;
+    }
+
+    // Disable smooth movement
+    public void DisableSmooth()
+    {
+        smoothMode = false;
+    }
+
+    // Check if smooth movement is enabled
+    public bool IsSmoothMode()
+    {
+        return smoothMode;
+    }
+    
 }
