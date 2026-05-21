@@ -25,7 +25,6 @@ public class Tile : MonoBehaviour
     public void move(int posx, int posy)
     {
         Vector3 target = RefList.Instance.gridd.GetCellCenterLocal(new Vector3Int(posx, posy, 5));
-        print(Refs);
         if (Refs.IsSmoothMode())
         {
             
@@ -68,18 +67,41 @@ public class Tile : MonoBehaviour
         isMoving = false;
     }
 
-    private IEnumerator SmoothMove(Vector3 target)
+    private IEnumerator SmoothMove(Vector3 target, float duration = 0.6f)
     {
         Vector3 start = transform.position;
         float t = 0f;
-        float duration = 0.8f; // adjust speed
 
         while (t < 1f)
         {
             t += Time.deltaTime / duration;
+            float x = Mathf.Clamp01(t);
 
-            // Bounce-like easing (ease out + little overshoot)
-            float easeT = Mathf.Sin(t * Mathf.PI * 0.5f); // simple ease-out
+            // EaseOutBounce curve
+            float n1 = 7.5625f;
+            float d1 = 2.75f;
+            float easeT;
+
+            if (x < 1f / d1)
+            {
+                easeT = n1 * x * x;
+            }
+            else if (x < 2f / d1)
+            {
+                x -= 1.5f / d1;
+                easeT = n1 * x * x + 0.75f;
+            }
+            else if (x < 2.5f / d1)
+            {
+                x -= 2.25f / d1;
+                easeT = n1 * x * x + 0.9375f;
+            }
+            else
+            {
+                x -= 2.625f / d1;
+                easeT = n1 * x * x + 0.984375f;
+            }
+
             transform.position = Vector3.Lerp(start, target, easeT);
 
             yield return null;

@@ -21,6 +21,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     {
         Refs = RefList.Instance;
     }
+    
 
     public void OnBeginDrag(PointerEventData eventData)
     {
