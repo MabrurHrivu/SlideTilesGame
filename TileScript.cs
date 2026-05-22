@@ -17,6 +17,9 @@ public class Tile : MonoBehaviour
     private bool isMoving = false;
     RefList Refs;
     public TMP_Text myText;
+    private TileDeathAnimation deathAnimation;
+
+    public bool IsMoving => isMoving || moveQueue.Count > 0;
 
     // NEW: displacement properties
     public int dispX => posX - oldX;
@@ -33,7 +36,10 @@ public class Tile : MonoBehaviour
 
             // Start processing queue if not already
             if (!isMoving)
+            {
+                isMoving = true;
                 StartCoroutine(ProcessQueue());
+            }
         }
         else
         {
@@ -56,8 +62,6 @@ public class Tile : MonoBehaviour
 
     private IEnumerator ProcessQueue()
     {
-        isMoving = true;
-
         while (moveQueue.Count > 0)
         {
             Vector3 target = moveQueue.Dequeue();
@@ -114,6 +118,7 @@ public class Tile : MonoBehaviour
     {
         tileData = GetComponent<TileData>();  // auto-find
         blockSprite = GetComponent<Image>();
+        deathAnimation = GetComponent<TileDeathAnimation>();
     }
 
     void Start()
@@ -161,5 +166,28 @@ public class Tile : MonoBehaviour
     public int getDisp()
     {
         return Mathf.Abs(dispX) + Mathf.Abs(dispY);
+    }
+
+    public IEnumerator PlayDeathAnimation()
+    {
+        if (deathAnimation != null)
+        {
+            yield return StartCoroutine(deathAnimation.Play(this));
+            yield break;
+        }
+
+        Quaternion startRotation = transform.localRotation;
+        Quaternion endRotation = startRotation * Quaternion.Euler(0f, 0f, 180f);
+        float elapsed = 0f;
+        float duration = 0.3f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            transform.localRotation = Quaternion.Slerp(startRotation, endRotation, Mathf.Clamp01(elapsed / duration));
+            yield return null;
+        }
+
+        transform.localRotation = endRotation;
     }
 }

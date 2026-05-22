@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     RefList Refs;
+    BoardActionQueue actionQueue;
     bool dragging = false, draggingleft = false, draggingUp = false;
     int activeLine = -1;
     bool jammed = false;
@@ -20,11 +21,14 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     void Start()
     {
         Refs = RefList.Instance;
+        actionQueue = BoardActionQueue.GetOrCreate();
     }
     
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        if (actionQueue != null && actionQueue.IsRunning) return;
+
         Refs.DisableSmooth();
         dragging = true;
         //tell the tiles to write down their positions before rrag
@@ -51,7 +55,7 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (!dragging || !dragValid) return;
+        if (!dragging || !dragValid || (actionQueue != null && actionQueue.IsRunning)) return;
 
         mousePos = Vector3Int.FloorToInt(Camera.main.ScreenToWorldPoint(Input.mousePosition)); //mouse position relative to game
         mousePos = Refs.gridd.LocalToCell(mousePos); //mouse position to cell co-ordinate
@@ -92,10 +96,14 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     {
         Refs.EnableSmooth();
         activeTile = null;
-        if (!checkMatches()) pullBackTiles();
+        List<MatchPair> matches = FindMatches();
+        if (matches.Count == 0) pullBackTiles();
         else
         {
-            CompactBoard();
+            foreach (MatchPair match in matches)
+                actionQueue.Enqueue(RemoveMatchedTiles(match));
+
+            actionQueue.Enqueue(CompactBoardRoutine());
         }
         jammed = false;
         dragging = false;
@@ -233,12 +241,14 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
     }
 
 
-    bool checkMatches()
+    List<MatchPair> FindMatches()
     {
-        // Skip check if no drag is active
-        if (!draggingleft && !draggingUp) return false;
+        List<MatchPair> matches = new List<MatchPair>();
+        HashSet<int> matchedTileIds = new HashSet<int>();
 
-        bool matched = false;
+        // Skip check if no drag is active
+        if (!draggingleft && !draggingUp) return matches;
+
         int limit = draggingleft ? Refs.columns : Refs.rows;
 
         for (int i = 0; i < limit; i++)
@@ -254,17 +264,17 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
             if (tile.getDisp() != 0)
             {
                 // Check for matching neighbor in each direction
-                if (tryMatchNeighbor(tile, tile.posX, tile.posY + 1))      matched = true; // up
-                else if (tryMatchNeighbor(tile, tile.posX + 1, tile.posY)) matched = true; // right
-                else if (tryMatchNeighbor(tile, tile.posX, tile.posY - 1)) matched = true; // down
-                else if (tryMatchNeighbor(tile, tile.posX - 1, tile.posY)) matched = true; // left
+                if (tryCollectMatch(tile, tile.posX, tile.posY + 1, matchedTileIds, matches))      continue; // up
+                if (tryCollectMatch(tile, tile.posX + 1, tile.posY, matchedTileIds, matches)) continue; // right
+                if (tryCollectMatch(tile, tile.posX, tile.posY - 1, matchedTileIds, matches)) continue; // down
+                if (tryCollectMatch(tile, tile.posX - 1, tile.posY, matchedTileIds, matches)) continue; // left
             }
         }
 
-        return matched;
+        return matches;
     }
 
-    bool tryMatchNeighbor(Tile tile, int neighborX, int neighborY)
+    bool tryCollectMatch(Tile tile, int neighborX, int neighborY, HashSet<int> matchedTileIds, List<MatchPair> matches)
     {
         // bounds check
         if (neighborX < 0 || neighborY < 0 ||
@@ -278,15 +288,45 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         if (neighbor.getDisp() == 0 &&
             tile.GetTileType() == neighbor.GetTileType())
         {
-            removeTile(tile);
-            removeTile(neighbor);
+            if (matchedTileIds.Contains(tile.getTileID()) || matchedTileIds.Contains(neighbor.getTileID()))
+                return false;
+
+            matchedTileIds.Add(tile.getTileID());
+            matchedTileIds.Add(neighbor.getTileID());
+            matches.Add(new MatchPair(tile, neighbor));
             return true;
         }
 
         return false;
     }
+
+    IEnumerator RemoveMatchedTiles(MatchPair match)
+    {
+        bool firstDone = match.first == null;
+        bool secondDone = match.second == null;
+
+        if (match.first != null)
+            StartCoroutine(PlayDeathAnimation(match.first, () => firstDone = true));
+
+        if (match.second != null)
+            StartCoroutine(PlayDeathAnimation(match.second, () => secondDone = true));
+
+        yield return new WaitUntil(() => firstDone && secondDone);
+
+        removeTile(match.first);
+        removeTile(match.second);
+    }
+
+    IEnumerator PlayDeathAnimation(Tile tile, Action onComplete)
+    {
+        yield return StartCoroutine(tile.PlayDeathAnimation());
+        onComplete?.Invoke();
+    }
+
     void removeTile(Tile tile)
     {
+        if (tile == null) return;
+
         int x = tile.posX;
         int y = tile.posY;
         int id = Refs.positionTable[x, y];
@@ -299,6 +339,27 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
 
         Destroy(tile.gameObject);
     }
+
+    IEnumerator CompactBoardRoutine()
+    {
+        CompactBoard();
+        yield return new WaitUntil(() => !AnyTileMoving());
+    }
+
+    bool AnyTileMoving()
+    {
+        foreach (GameObject tileObject in Refs.spawnedTile)
+        {
+            if (tileObject == null) continue;
+
+            Tile tile = tileObject.GetComponent<Tile>();
+            if (tile != null && tile.IsMoving)
+                return true;
+        }
+
+        return false;
+    }
+
     void CompactBoard()
     {
         int cols = Refs.columns;
@@ -350,6 +411,18 @@ public class BlockMover : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDr
         }
 
         Refs.positionTable = finalTable;
+    }
+
+    struct MatchPair
+    {
+        public readonly Tile first;
+        public readonly Tile second;
+
+        public MatchPair(Tile first, Tile second)
+        {
+            this.first = first;
+            this.second = second;
+        }
     }
 
 }
